@@ -1,7 +1,9 @@
 package com.orepay.listeners;
 
 import com.orepay.OrePay;
-import net.milkbowl.vault.economy.Economy;
+import com.orepay.api.OrePayAPI;
+import com.orepay.api.events.OreMinedEvent;
+import com.orepay.api.events.PlayerRewardedEvent;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -9,21 +11,21 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.metadata.FixedMetadataValue;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Listener for mining events
+ */
 public class MiningListener implements Listener {
     
     private final OrePay plugin;
-    private final Map<UUID, Long> lastMiningTimes = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> veinCounter = new ConcurrentHashMap<>();
     
-    // Vein mining detection constants
-    private static final long VEIN_MINING_TIMEOUT_MS = 500; // 500ms timeout for vein mining detection
+    // Maps to track vein mining
+    private final Map<UUID, Long> lastMiningTime = new HashMap<>();
+    private final Map<UUID, Material> lastMinedOre = new HashMap<>();
     
     public MiningListener(OrePay plugin) {
         this.plugin = plugin;
@@ -33,121 +35,125 @@ public class MiningListener implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
         Block block = event.getBlock();
+        Material material = block.getType();
         
-        // Skip if player doesn't have permission
+        // Check if this is an ore
+        if (!isOre(material)) {
+            return;
+        }
+        
+        // Check if the player has permission to receive rewards
         if (!player.hasPermission("orepay.earn")) {
             return;
         }
         
-        // Check if the broken block is an ore
-        if (!isOre(block.getType())) {
+        // Check if the player has rewards enabled
+        if (!plugin.getDataManager().areRewardsEnabledSync(player)) {
             return;
         }
         
-        // Handle vein mining
-        UUID playerId = player.getUniqueId();
-        long currentTime = System.currentTimeMillis();
+        // Get the reward amount
+        double rewardAmount = plugin.getConfigManager().getRewardForOre(material);
         
-        // Check if this is part of a vein mining operation
-        if (isPartOfVeinMining(playerId, currentTime)) {
-            // Increment counter for this vein mining operation
-            veinCounter.put(playerId, veinCounter.getOrDefault(playerId, 0) + 1);
-        } else {
-            // Reset counter for new mining operation
-            veinCounter.put(playerId, 1);
+        // Skip if reward is 0 or negative
+        if (rewardAmount <= 0) {
+            return;
         }
         
-        // Update last mining time
-        lastMiningTimes.put(playerId, currentTime);
+        // Check for vein mining
+        if (isVeinMining(player, material)) {
+            // Apply vein mining multiplier if enabled
+            if (plugin.getConfigManager().getBoolean("vein-mining.enable-multiplier", true)) {
+                double veinMultiplier = plugin.getConfigManager().getDouble("vein-mining.multiplier", 0.5);
+                rewardAmount *= veinMultiplier;
+            }
+        }
         
-        // Reward player
-        rewardPlayer(player, block.getType());
+        // Update vein mining tracking
+        updateVeinMiningStatus(player, material);
+        
+        // Fire OreMinedEvent (cancellable)
+        OreMinedEvent minedEvent = new OreMinedEvent(player, material, rewardAmount);
+        plugin.getServer().getPluginManager().callEvent(minedEvent);
+        
+        if (minedEvent.isCancelled()) {
+            return;
+        }
+        
+        // Apply multiplier
+        double multiplier = plugin.getMultiplierManager().getMultiplier(player);
+        double finalAmount = minedEvent.getReward() * multiplier;
+        
+        // If amount is too small due to multipliers, skip
+        if (finalAmount < plugin.getConfigManager().getDouble("minimum-payout", 0.01)) {
+            return;
+        }
+        
+        // Give reward
+        plugin.getEconomy().depositPlayer(player, finalAmount);
+        
+        // Record statistic
+        plugin.getDataManager().recordMiningStatistic(player, material, finalAmount);
+        
+        // Send notification
+        plugin.getUiManager().sendRewardNotification(player, material, finalAmount);
+        
+        // Fire PlayerRewardedEvent
+        PlayerRewardedEvent rewardedEvent = new PlayerRewardedEvent(player, material, finalAmount, multiplier);
+        plugin.getServer().getPluginManager().callEvent(rewardedEvent);
     }
     
     /**
-     * Checks if a block break is part of an ongoing vein mining operation
-     * @param playerId The player's UUID
-     * @param currentTime Current system time in milliseconds
-     * @return true if part of vein mining, false otherwise
+     * Check if a material is an ore with a configured reward
+     * @param material The material to check
+     * @return True if the material is a rewarded ore
      */
-    private boolean isPartOfVeinMining(UUID playerId, long currentTime) {
-        if (!lastMiningTimes.containsKey(playerId)) {
+    private boolean isOre(Material material) {
+        return plugin.getConfigManager().getRewardForOre(material) > 0;
+    }
+    
+    /**
+     * Check if the player is vein mining
+     * @param player The player
+     * @param material The material being mined
+     * @return True if the player is vein mining
+     */
+    private boolean isVeinMining(Player player, Material material) {
+        // Check if vein mining detection is enabled
+        if (!plugin.getConfigManager().getBoolean("vein-mining.detection-enabled", true)) {
             return false;
         }
         
-        long lastMiningTime = lastMiningTimes.get(playerId);
-        return (currentTime - lastMiningTime) < VEIN_MINING_TIMEOUT_MS;
-    }
-    
-    /**
-     * Rewards a player for mining an ore
-     * @param player The player to reward
-     * @param material The material (ore) that was mined
-     */
-    private void rewardPlayer(Player player, Material material) {
-        double reward = plugin.getConfigManager().getRewardForOre(material);
+        UUID uuid = player.getUniqueId();
         
-        if (reward <= 0) {
-            return;
+        // Check if player has mined recently
+        if (!lastMiningTime.containsKey(uuid) || !lastMinedOre.containsKey(uuid)) {
+            return false;
         }
         
-        Economy economy = plugin.getEconomy();
-        if (economy != null) {
-            economy.depositPlayer(player, reward);
-            
-            // Show message if configured
-            if (plugin.getConfigManager().shouldShowRewardMessages()) {
-                String message = plugin.getConfigManager().getRewardMessage()
-                        .replace("{amount}", String.format("%.2f", reward))
-                        .replace("{ore}", formatOreName(material.name()));
-                player.sendMessage(message);
-            }
-        }
-    }
-    
-    /**
-     * Checks if a material is an ore
-     * @param material The material to check
-     * @return true if it's an ore, false otherwise
-     */
-    private boolean isOre(Material material) {
-        return plugin.getConfigManager().isConfiguredOre(material);
-    }
-    
-    /**
-     * Formats the ore name for display
-     * @param oreName The raw ore name
-     * @return Formatted ore name
-     */
-    private String formatOreName(String oreName) {
-        oreName = oreName.replace("_", " ").toLowerCase();
-        StringBuilder formatted = new StringBuilder();
-        boolean capitalizeNext = true;
-        
-        for (char c : oreName.toCharArray()) {
-            if (capitalizeNext && Character.isLetter(c)) {
-                formatted.append(Character.toUpperCase(c));
-                capitalizeNext = false;
-            } else {
-                formatted.append(c);
-                if (c == ' ') {
-                    capitalizeNext = true;
-                }
-            }
+        // Check if the ore is the same as last time
+        if (lastMinedOre.get(uuid) != material) {
+            return false;
         }
         
-        return formatted.toString();
+        // Check if within timeout period
+        long timeout = plugin.getConfigManager().getLong("vein-mining.timeout-ticks", 15L);
+        long currentTime = plugin.getServer().getCurrentTick();
+        long lastTime = lastMiningTime.get(uuid);
+        
+        return (currentTime - lastTime) <= timeout;
     }
     
     /**
-     * Cleans up expired vein mining data
+     * Update vein mining status for a player
+     * @param player The player
+     * @param material The material being mined
      */
-    public void cleanupExpiredData() {
-        long currentTime = System.currentTimeMillis();
-        lastMiningTimes.entrySet().removeIf(entry -> 
-            (currentTime - entry.getValue()) > VEIN_MINING_TIMEOUT_MS);
+    private void updateVeinMiningStatus(Player player, Material material) {
+        UUID uuid = player.getUniqueId();
+        long currentTime = plugin.getServer().getCurrentTick();
         
-        // Players with no recent mining activity should have vein counters cleared
-        veinCounter.keySet().removeIf(playerId -> !lastMiningTimes.containsKey(playerId));
+        lastMiningTime.put(uuid, currentTime);
+        lastMinedOre.put(uuid, material);
     }
 }

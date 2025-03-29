@@ -1,17 +1,68 @@
 name: OrePay
 version: 1.0.0
 main: com.orepay.OrePay
-api-version: '1.21'
+api-version: 1.21
+description: A plugin that rewards players for mining ores
+author: Your Name
+website: https://example.com
+
+# Dependencies
 depend: [Vault]
-description: Rewards players with money when mining ores, with vein mining support
-author: OrePay Developer
+softdepend: [PlaceholderAPI]
+
+commands:
+  orepay:
+    description: Main command for OrePay
+    usage: /<command> [subcommand]
+    aliases: [op]
+    permission: orepay.command
 
 permissions:
+  # Main permissions
   orepay.earn:
-    description: Allows player to earn money from mining ores
+    description: Allows players to earn rewards for mining ores
     default: true
-  orepay.admin:
-    description: Allows access to admin commands
-    default: op
+  
+  orepay.command:
+    description: Allows players to use the OrePay command
+    default: true
     children:
-      orepay.earn: true
+      orepay.command.help: true
+  
+  # Command permissions
+  orepay.command.help:
+    description: Allows players to view help information
+    default: true
+  
+  orepay.command.reload:
+    description: Allows players to reload the plugin
+    default: op
+  
+  orepay.command.stats:
+    description: Allows players to view their own statistics
+    default: true
+  
+  orepay.command.stats.others:
+    description: Allows players to view statistics for other players
+    default: op
+  
+  orepay.command.toggle:
+    description: Allows players to toggle their own rewards
+    default: true
+  
+  orepay.command.toggle.others:
+    description: Allows players to toggle rewards for other players
+    default: op
+  
+  # Multiplier permissions
+  orepay.multiplier.1.5:
+    description: Gives players a 1.5x multiplier
+    default: false
+  
+  orepay.multiplier.2:
+    description: Gives players a 2x multiplier
+    default: false
+  
+  orepay.multiplier.3:
+    description: Gives players a 3x multiplier
+    default: false

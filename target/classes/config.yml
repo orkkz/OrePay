@@ -1,39 +1,137 @@
-# OrePay Configuration
-# Version 1.0.0
+# OrePay Configuration File
+# 
+# This plugin rewards players with Vault currency when they mine ores
+# Players need the orepay.earn permission to receive rewards
 
-# Ore rewards - specify the amount of money given per each ore type
-# Format: MATERIAL_NAME: reward_amount
-ore-rewards:
-  COAL_ORE: 2.0
-  DEEPSLATE_COAL_ORE: 2.5
-  IRON_ORE: 5.0
-  DEEPSLATE_IRON_ORE: 6.0
-  COPPER_ORE: 3.0
-  DEEPSLATE_COPPER_ORE: 3.5
-  GOLD_ORE: 8.0
-  DEEPSLATE_GOLD_ORE: 10.0
-  REDSTONE_ORE: 4.0
-  DEEPSLATE_REDSTONE_ORE: 5.0
-  LAPIS_ORE: 6.0
-  DEEPSLATE_LAPIS_ORE: 7.0
-  EMERALD_ORE: 15.0
-  DEEPSLATE_EMERALD_ORE: 20.0
-  DIAMOND_ORE: 25.0
-  DEEPSLATE_DIAMOND_ORE: 30.0
-  NETHER_GOLD_ORE: 4.0
-  NETHER_QUARTZ_ORE: 3.0
-  ANCIENT_DEBRIS: 50.0
+# Plugin prefix for messages
+prefix: "&7[&6OrePay&7] "
 
-# Plugin settings
-settings:
-  # Whether to show reward messages when mining ores
-  show-reward-messages: true
+# Reward amounts for each ore
+# Use material names from here: https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/Material.html
+rewards:
+  COAL_ORE: 1.0
+  DEEPSLATE_COAL_ORE: 1.2
+  IRON_ORE: 2.0
+  DEEPSLATE_IRON_ORE: 2.5
+  COPPER_ORE: 1.5
+  DEEPSLATE_COPPER_ORE: 1.8
+  GOLD_ORE: 3.0
+  DEEPSLATE_GOLD_ORE: 3.5
+  REDSTONE_ORE: 2.0
+  DEEPSLATE_REDSTONE_ORE: 2.5
+  LAPIS_ORE: 3.0
+  DEEPSLATE_LAPIS_ORE: 3.5
+  DIAMOND_ORE: 5.0
+  DEEPSLATE_DIAMOND_ORE: 6.0
+  EMERALD_ORE: 7.0
+  DEEPSLATE_EMERALD_ORE: 8.0
+  NETHER_QUARTZ_ORE: 1.5
+  NETHER_GOLD_ORE: 2.0
+  ANCIENT_DEBRIS: 10.0
+
+# Minimum payout amount (to prevent tiny fractions due to multipliers)
+minimum-payout: 0.01
+
+# Vein mining settings
+vein-mining:
+  # Enable vein mining detection
+  detection-enabled: true
   
-  # Message template for rewards
-  # Available placeholders:
-  # {amount} - the amount of money rewarded
-  # {ore} - the name of the ore mined
-  reward-message: "§a+{amount} coins §7(mined {ore})"
+  # Time window in ticks for considering multiple blocks as part of the same vein (20 ticks = 1 second)
+  timeout-ticks: 15
+  
+  # Enable reduced rewards for vein mining
+  enable-multiplier: true
+  
+  # Multiplier applied to rewards when vein mining (0.5 = 50% of normal reward)
+  multiplier: 0.5
 
-# Don't change this
-config-version: 1
+# Statistics settings
+statistics:
+  # Enable player statistics tracking
+  enabled: true
+
+# Storage settings
+storage:
+  # Use database for storage (instead of YAML)
+  use-database: false
+  
+  database:
+    # Database type (sqlite or mysql)
+    type: sqlite
+    
+    # MySQL settings (only used if type is mysql)
+    mysql:
+      host: localhost
+      port: 3306
+      database: orepay
+      username: root
+      password: ""
+
+# Multiplier settings
+multipliers:
+  # Enable multipliers
+  enabled: true
+  
+  # Base multiplier (applied to everyone)
+  base: 1.0
+  
+  # How multipliers stack: "add" or "multiply"
+  # add: base + (perm - 1) + (temp - 1) + (world - 1)
+  # multiply: base * perm * temp * world
+  stack-type: add
+  
+  # Permission-based multipliers
+  permission:
+    enabled: true
+  
+  # Temporary multipliers
+  temporary:
+    enabled: true
+  
+  # World-specific multipliers
+  world:
+    enabled: true
+    worlds:
+      # Examples:
+      # world_mining: 1.5
+      # resource_world: 2.0
+
+# Notification settings
+notifications:
+  # Notification type: chat, actionbar, title, subtitle, none
+  type: chat
+  
+  # Title notification settings
+  title-fade-in: 5   # ticks
+  title-stay: 20     # ticks
+  title-fade-out: 5  # ticks
+
+# Messages
+messages:
+  # Notification messages
+  notifications:
+    chat: "&aYou earned &6%amount% %currency%&a for mining &6%ore%&a!"
+    actionbar: "&aYou earned &6%amount% %currency%&a for mining &6%ore%&a!"
+    title: "&6OrePay"
+    subtitle: "&a+%amount% %currency% &7(&6%ore%&7)"
+  
+  # Command messages
+  commands:
+    no-permission: "&cYou don't have permission to use this command!"
+    player-only: "&cThis command can only be used by players!"
+    player-not-found: "&cPlayer not found!"
+    invalid-toggle: "&cInvalid option! Use 'on' or 'off'."
+    toggle-on: "&aYou have &2enabled &aore rewards!"
+    toggle-off: "&aYou have &cdisabled &aore rewards!"
+    toggle-on-other: "&aYou have &2enabled &aore rewards for &6%player%&a!"
+    toggle-off-other: "&aYou have &cdisabled &aore rewards for &6%player%&a!"
+    reload-success: "&aConfiguration reloaded in &6%time%ms&a!"
+    no-stats: "&cNo statistics found for this player!"
+  
+  # Statistics view
+  stats-header:
+    - "&6===== &e%player%'s Mining Statistics &6====="
+    - "&eTotals: &6%total_mined% &eores mined, &6%total_earned% %currency% &eearned"
+  
+  stats-line: "&e%ore%: &6%amount% &emined, &6%earned% %currency% &eearned"
