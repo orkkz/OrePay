@@ -1,0 +1,17 @@
+name: OrePay
+version: 1.0.0
+main: com.orepay.OrePay
+api-version: '1.21'
+depend: [Vault]
+description: Rewards players with money when mining ores, with vein mining support
+author: OrePay Developer
+
+permissions:
+  orepay.earn:
+    description: Allows player to earn money from mining ores
+    default: true
+  orepay.admin:
+    description: Allows access to admin commands
+    default: op
+    children:
+      orepay.earn: true
