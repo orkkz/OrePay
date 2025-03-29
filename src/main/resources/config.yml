@@ -109,12 +109,21 @@ notifications:
 
 # Messages
 messages:
+  # General messages
+  general:
+    currency-singular: "dollar"
+    currency-plural: "dollars"
+    rewards-disabled: "&cOre rewards are currently disabled for you."
+    no-reward-permission: "&cYou don't have permission to earn rewards for mining."
+    multiplier-active: "&aYou have an active multiplier of &6%multiplier%x&a!"
+  
   # Notification messages
   notifications:
     chat: "&aYou earned &6%amount% %currency%&a for mining &6%ore%&a!"
     actionbar: "&aYou earned &6%amount% %currency%&a for mining &6%ore%&a!"
     title: "&6OrePay"
     subtitle: "&a+%amount% %currency% &7(&6%ore%&7)"
+    none: ""  # Empty message when notifications are disabled
   
   # Command messages
   commands:
@@ -128,6 +137,9 @@ messages:
     toggle-off-other: "&aYou have &cdisabled &aore rewards for &6%player%&a!"
     reload-success: "&aConfiguration reloaded in &6%time%ms&a!"
     no-stats: "&cNo statistics found for this player!"
+    help-header: "&6===== OrePay Help ====="
+    help-footer: "&6======================="
+    help-command: "&e/%command% &7- &a%description%"
   
   # Statistics view
   stats-header:
@@ -135,3 +147,4 @@ messages:
     - "&eTotals: &6%total_mined% &eores mined, &6%total_earned% %currency% &eearned"
   
   stats-line: "&e%ore%: &6%amount% &emined, &6%earned% %currency% &eearned"
+  stats-footer: "&6=================================="
